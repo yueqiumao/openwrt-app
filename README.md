@@ -2,7 +2,6 @@
 
 一个为 Redmi AX6（ImmortalWrt 24.10.6）定制的原生 Android 监控客户端。包名 `com.ax6.luyouqi`，Kotlin + Jetpack Compose + Material 3，**直连路由器的 ubus JSON-RPC（`/ubus`）**，不经任何中间服务。
 
-> 早期版本的网页端（Node 服务 + 前端页面）已废弃并从仓库移除，只保留本 Android 工程。
 
 ## 功能
 
