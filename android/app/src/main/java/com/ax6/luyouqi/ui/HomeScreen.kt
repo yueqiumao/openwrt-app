@@ -250,20 +250,20 @@ private fun OverviewTab(
 
         Spacer(Modifier.height(12.dp))
 
+        // 累计收发作为曲线的手势页脚：手指落在这行也能拖动定位
         RateChart(
             points = state.history,
             windowSec = state.range,
-            modifier = Modifier.fillMaxWidth().height(118.dp),
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("累计接收 ${data?.let { Fmt.bytes(it.rxTotal) } ?: "—"}", color = Ax6Tokens.Muted, fontSize = 11.sp)
-            Text("累计发送 ${data?.let { Fmt.bytes(it.txTotal) } ?: "—"}", color = Ax6Tokens.Muted, fontSize = 11.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("累计接收 ${data?.let { Fmt.bytes(it.rxTotal) } ?: "—"}", color = Ax6Tokens.Muted, fontSize = 11.sp)
+                Text("累计发送 ${data?.let { Fmt.bytes(it.txTotal) } ?: "—"}", color = Ax6Tokens.Muted, fontSize = 11.sp)
+            }
         }
 
         if (state.error != null) {
@@ -351,7 +351,12 @@ private fun chartSamples(points: List<HistoryPoint>): List<ChartSample> {
 }
 
 @Composable
-private fun RateChart(points: List<HistoryPoint>, windowSec: Int, modifier: Modifier) {
+private fun RateChart(
+    points: List<HistoryPoint>,
+    windowSec: Int,
+    modifier: Modifier = Modifier,
+    footer: @Composable () -> Unit = {},
+) {
     val downColor = Ax6Tokens.Down
     val upColor = Ax6Tokens.Up
     val gridColor = Ax6Tokens.Line
@@ -369,38 +374,40 @@ private fun RateChart(points: List<HistoryPoint>, windowSec: Int, modifier: Modi
         }
     }
 
-    BoxWithConstraints(modifier) {
+    // 手势区覆盖「曲线 + 页脚（累计收发）」整块：整块独占触摸，不参与页面滚动
+    Box(
+        modifier = modifier.pointerInput(samples, windowSec) {
+
+            fun pick(x: Float, w: Float) {
+                if (samples.size < 2 || w <= 0f) return
+                val endT = samples.last().t
+                val startT = endT - spanMs.toLong()
+                val t = startT + ((x / w) * spanMs).toLong()
+                val nearest = samples.minByOrNull { kotlin.math.abs(it.t - t) } ?: return
+                val frac = ((nearest.t - startT).toFloat() / spanMs).coerceIn(0f, 1f)
+                selected = frac to nearest
+            }
+            // 曲线区域的触摸全部由图表接管（不参与页面滚动）：
+            // 按下即选中，按住左右滑动连续定位，松手后 4 秒消失。
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                down.consume()
+                pick(down.position.x, size.width.toFloat())
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    pick(change.position.x, size.width.toFloat())
+                    change.consume()
+                    if (!change.pressed) break
+                }
+            }
+        },
+    ) {
+        Column {
+            BoxWithConstraints(Modifier.fillMaxWidth().height(118.dp)) {
         val chartWidth = maxWidth
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(samples, windowSec) {
-                    fun pick(x: Float, w: Float) {
-                        if (samples.size < 2 || w <= 0f) return
-                        val endT = samples.last().t
-                        val startT = endT - spanMs.toLong()
-                        val t = startT + ((x / w) * spanMs).toLong()
-                        val nearest = samples.minByOrNull { kotlin.math.abs(it.t - t) } ?: return
-                        val frac = ((nearest.t - startT).toFloat() / spanMs).coerceIn(0f, 1f)
-                        selected = frac to nearest
-                    }
-                    // 曲线区域的触摸全部由图表接管（不参与页面滚动）：
-                    // 按下即选中，按住左右滑动连续定位，松手后 4 秒消失。
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        down.consume()
-                        pick(down.position.x, size.width.toFloat())
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            pick(change.position.x, size.width.toFloat())
-                            change.consume()
-                            if (!change.pressed) break
-                        }
-                    }
-                },
-        ) {
+        Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
 
@@ -559,6 +566,9 @@ private fun RateChart(points: List<HistoryPoint>, windowSec: Int, modifier: Modi
                 Text(if (p.missing) "↓ —" else "↓ ${Fmt.rate(p.down)}", color = Ax6Tokens.Down, style = numStyle(11))
                 Text(if (p.missing) "↑ —" else "↑ ${Fmt.rate(p.up)}", color = Ax6Tokens.Up, style = numStyle(11))
             }
+        }
+            }
+            footer()
         }
     }
 }
