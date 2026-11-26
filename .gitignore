@@ -1,0 +1,23 @@
+# ---- Android 构建产物 ----
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/local.properties
+android/.idea/
+*.iml
+
+# ---- 签名与安装包 ----
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties
+
+# ---- 出包目录 / 备份 / 真机抓包 ----
+[安卓]/
+backup/
+
+# ---- 系统文件 ----
+.DS_Store
+Thumbs.db

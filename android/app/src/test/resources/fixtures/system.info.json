@@ -1,0 +1,33 @@
+{
+  "localtime": 1795531683,
+  "uptime": 18181,
+  "load": [
+    0,
+    0,
+    0
+  ],
+  "memory": {
+    "total": 424165376,
+    "free": 197566464,
+    "shared": 462848,
+    "buffered": 53248,
+    "available": 203567104,
+    "cached": 47837184
+  },
+  "root": {
+    "total": 74660,
+    "free": 73224,
+    "used": 1436,
+    "avail": 69372
+  },
+  "tmp": {
+    "total": 207112,
+    "free": 206660,
+    "used": 452,
+    "avail": 206660
+  },
+  "swap": {
+    "total": 0,
+    "free": 0
+  }
+}

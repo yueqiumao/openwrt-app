@@ -1,0 +1,248 @@
+{
+  "radio0": {
+    "up": true,
+    "pending": false,
+    "autostart": true,
+    "disabled": false,
+    "retry_setup_failed": false,
+    "config": {
+      "path": "platform/soc@0/c000000.wifi",
+      "band": "5g",
+      "channel": "44",
+      "htmode": "HE80",
+      "country": "CN",
+      "cell_density": 0,
+      "mu_beamformer": true,
+      "disabled": false
+    },
+    "interfaces": [
+      {
+        "section": "default_radio0",
+        "ifname": "phy0-ap0",
+        "config": {
+          "mode": "ap",
+          "ssid": "(已脱敏 SSID)",
+          "encryption": "psk2+ccmp",
+          "key": "(redacted)",
+          "network": [
+            "lan"
+          ]
+        },
+        "vlans": [],
+        "stations": [],
+        "iwinfo": {
+          "signal": -27,
+          "noise": -108,
+          "channel": 44,
+          "country": "CN",
+          "phy": "phy0",
+          "txpower": 23,
+          "txpower_offset": 0,
+          "frequency": 5220,
+          "frequency_offset": 0,
+          "hwmodes": [
+            "n",
+            "ac",
+            "ax"
+          ],
+          "hwmodes_text": "ac/ax/n",
+          "htmodes": [
+            "HT20",
+            "HT40",
+            "VHT20",
+            "VHT40",
+            "VHT80",
+            "VHT160",
+            "HE20",
+            "HE40",
+            "HE80",
+            "HE160"
+          ],
+          "hardware": {
+            "id": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "name": "Qualcomm Atheros IPQ8074"
+          },
+          "quality": 70,
+          "quality_max": 70,
+          "bitrate": 1200900,
+          "mode": "Master",
+          "ssid": "(已脱敏 SSID)",
+          "bssid": "02:00:00:00:00:03",
+          "encryption": {
+            "enabled": true,
+            "wpa": [
+              2
+            ],
+            "authentication": [
+              "psk"
+            ],
+            "ciphers": [
+              "ccmp"
+            ]
+          }
+        }
+      }
+    ],
+    "iwinfo": {
+      "signal": -27,
+      "noise": -108,
+      "channel": 44,
+      "country": "CN",
+      "phy": "phy0",
+      "txpower": 23,
+      "txpower_offset": 0,
+      "frequency": 5220,
+      "frequency_offset": 0,
+      "hwmodes": [
+        "n",
+        "ac",
+        "ax"
+      ],
+      "hwmodes_text": "ac/ax/n",
+      "htmodes": [
+        "HT20",
+        "HT40",
+        "VHT20",
+        "VHT40",
+        "VHT80",
+        "VHT160",
+        "HE20",
+        "HE40",
+        "HE80",
+        "HE160"
+      ],
+      "hardware": {
+        "id": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "name": "Qualcomm Atheros IPQ8074"
+      }
+    }
+  },
+  "radio1": {
+    "up": true,
+    "pending": false,
+    "autostart": true,
+    "disabled": false,
+    "retry_setup_failed": false,
+    "config": {
+      "path": "platform/soc@0/c000000.wifi+1",
+      "band": "2g",
+      "channel": "5",
+      "htmode": "HE20",
+      "country": "AU",
+      "txpower": 23,
+      "cell_density": 0,
+      "disabled": false
+    },
+    "interfaces": [
+      {
+        "section": "default_radio1",
+        "ifname": "phy1-ap0",
+        "config": {
+          "mode": "ap",
+          "ssid": "(已脱敏 SSID)",
+          "encryption": "psk2+ccmp",
+          "key": "(redacted)",
+          "network": [
+            "lan"
+          ]
+        },
+        "vlans": [],
+        "stations": [],
+        "iwinfo": {
+          "signal": -49,
+          "noise": -106,
+          "channel": 5,
+          "country": "CN",
+          "phy": "phy1",
+          "txpower": 23,
+          "txpower_offset": 0,
+          "frequency": 2432,
+          "frequency_offset": 0,
+          "hwmodes": [
+            "b",
+            "g",
+            "n",
+            "ax"
+          ],
+          "hwmodes_text": "ax/b/g/n",
+          "htmodes": [
+            "HT20",
+            "HT40",
+            "HE20",
+            "HE40"
+          ],
+          "hardware": {
+            "id": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "name": "Qualcomm Atheros IPQ8074"
+          },
+          "quality": 61,
+          "quality_max": 70,
+          "bitrate": 41600,
+          "mode": "Master",
+          "ssid": "(已脱敏 SSID)",
+          "bssid": "02:00:00:00:00:01",
+          "encryption": {
+            "enabled": true,
+            "wpa": [
+              2
+            ],
+            "authentication": [
+              "psk"
+            ],
+            "ciphers": [
+              "ccmp"
+            ]
+          }
+        }
+      }
+    ],
+    "iwinfo": {
+      "signal": -49,
+      "noise": -106,
+      "channel": 5,
+      "country": "CN",
+      "phy": "phy1",
+      "txpower": 23,
+      "txpower_offset": 0,
+      "frequency": 2432,
+      "frequency_offset": 0,
+      "hwmodes": [
+        "b",
+        "g",
+        "n",
+        "ax"
+      ],
+      "hwmodes_text": "ax/b/g/n",
+      "htmodes": [
+        "HT20",
+        "HT40",
+        "HE20",
+        "HE40"
+      ],
+      "hardware": {
+        "id": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "name": "Qualcomm Atheros IPQ8074"
+      }
+    }
+  }
+}

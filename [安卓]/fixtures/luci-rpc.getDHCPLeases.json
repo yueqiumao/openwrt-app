@@ -1,0 +1,51 @@
+{
+  "dhcp_leases": [
+    {
+      "expires": 7022,
+      "hostname": "AX6",
+      "macaddr": "02:00:00:00:00:09",
+      "ipaddr": "192.168.99.125"
+    },
+    {
+      "expires": 7066,
+      "hostname": "AX6",
+      "macaddr": "02:00:00:00:00:0b",
+      "duid": "(redacted)",
+      "ipaddr": "192.168.99.106"
+    },
+    {
+      "expires": 5838,
+      "hostname": "AX6",
+      "macaddr": "02:00:00:00:00:0a",
+      "ipaddr": "192.168.99.142"
+    },
+    {
+      "expires": 4999,
+      "hostname": "AX6",
+      "macaddr": "02:00:00:00:00:0d",
+      "duid": "(redacted)",
+      "ipaddr": "192.168.99.104"
+    },
+    {
+      "expires": 5533,
+      "hostname": "AX6",
+      "macaddr": "02:00:00:00:00:0c",
+      "ipaddr": "192.168.99.100"
+    },
+    {
+      "expires": 5552,
+      "hostname": "AX6",
+      "macaddr": "02:00:00:00:00:04",
+      "duid": "(redacted)",
+      "ipaddr": "192.168.99.109"
+    },
+    {
+      "expires": 25043,
+      "hostname": "AX6",
+      "macaddr": "02:00:00:00:00:05",
+      "duid": "(redacted)",
+      "ipaddr": "192.168.99.88"
+    }
+  ],
+  "dhcp6_leases": []
+}

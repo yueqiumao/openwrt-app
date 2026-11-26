@@ -1,0 +1,26 @@
+AX6 探测 @ 2026-11-24T06:48:02.670Z
+target 192.168.99.11:80
+
+session.login  OK
+system.board                       ok        374B  -> fixtures/system.board.json
+system.info                        ok        326B  -> fixtures/system.info.json
+network.interface.dump             ok        3363B  -> fixtures/network.interface.dump.json
+luci-rpc.getNetworkDevices         ok        5758B  -> fixtures/luci-rpc.getNetworkDevices.json
+luci-rpc.getWirelessDevices        ok        2574B  -> fixtures/luci-rpc.getWirelessDevices.json
+network.wireless.status            FAIL      Access denied
+luci.getTempInfo                   ok        47B  -> fixtures/luci.getTempInfo.json
+luci.getCPUInfo                    ok        55B  -> fixtures/luci.getCPUInfo.json
+file.read.conntrack_count          ok        16B  -> fixtures/file.read.conntrack_count.json
+file.read.conntrack_max            ok        18B  -> fixtures/file.read.conntrack_max.json
+file.read.proc_net_dev             code 6   （被拒绝）
+file.read.sysfs_wan_carrier        code 6   （被拒绝）
+file.read.sysfs_wan_speed          code 6   （被拒绝）
+luci.vantage.wired                 ok        853B  -> fixtures/luci.vantage.wired.json
+luci-rpc.getDHCPLeases             ok        850B  -> fixtures/luci-rpc.getDHCPLeases.json
+luci-rpc.getHostHints              ok        1547B  -> fixtures/luci-rpc.getHostHints.json
+iwinfo.info.phy0-ap0               ok        579B  -> fixtures/iwinfo.info.phy0-ap0.json
+iwinfo.assoclist.phy0-ap0          ok        659B  -> fixtures/iwinfo.assoclist.phy0-ap0.json
+iwinfo.info.phy1-ap0               ok        529B  -> fixtures/iwinfo.info.phy1-ap0.json
+iwinfo.assoclist.phy1-ap0          ok        4321B  -> fixtures/iwinfo.assoclist.phy1-ap0.json
+
+LuCI RPC 对照: http=200 status=null Access denied

@@ -1,0 +1,16 @@
+{
+  "kernel": "6.6.133",
+  "hostname": "AX6",
+  "system": "ARMv8 Processor rev 4",
+  "model": "Redmi AX6 (stock layout)",
+  "board_name": "redmi,ax6-stock",
+  "rootfs_type": "squashfs",
+  "release": {
+    "distribution": "ImmortalWrt",
+    "version": "24.10.6",
+    "revision": "r33869-cf234f8de6d5",
+    "target": "qualcommax/ipq807x",
+    "description": "ImmortalWrt 24.10.6 r33869-cf234f8de6d5",
+    "builddate": "1776821074"
+  }
+}

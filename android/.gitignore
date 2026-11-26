@@ -1,0 +1,14 @@
+# 构建产物与本地配置，不进仓库
+build/
+app/build/
+.gradle/
+.kotlin/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# 签名材料永不入库
+*.jks
+*.keystore
+keystore/
