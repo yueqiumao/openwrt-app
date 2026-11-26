@@ -15,3 +15,8 @@
 -keepclassmembers class com.ax6.luyouqi.** {
     *** Companion;
 }
+
+# Room 生成的实现类与实体
+-keep class com.ax6.luyouqi.data.** { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
+-dontwarn androidx.room.**

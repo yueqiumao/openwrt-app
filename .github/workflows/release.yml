@@ -1,0 +1,82 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Check tag matches versionName
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          NAME=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "versionName=$NAME tag=$TAG"
+          if [ "$NAME" != "$TAG" ]; then
+            echo "::error::tag $TAG 与 versionName $NAME 不一致"
+            exit 1
+          fi
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.AX6_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::缺少 secret AX6_KEYSTORE_BASE64"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/ax6-release.jks"
+
+      - name: Build release APK
+        env:
+          AX6_KEYSTORE: ${{ runner.temp }}/ax6-release.jks
+          AX6_KEYSTORE_PASSWORD: ${{ secrets.AX6_KEYSTORE_PASSWORD }}
+          AX6_KEY_ALIAS: ${{ secrets.AX6_KEY_ALIAS }}
+          AX6_KEY_PASSWORD: ${{ secrets.AX6_KEY_PASSWORD }}
+        run: |
+          cd android
+          gradle :app:assembleRelease :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Collect artifact
+        run: |
+          NAME=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          mkdir -p artifacts
+          cp "$APK" "artifacts/AX6助手-v${NAME}.apk"
+          md5sum "artifacts/AX6助手-v${NAME}.apk" | tee artifacts/md5.txt
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/AX6助手-*.apk
+            artifacts/md5.txt
+          generate_release_notes: true

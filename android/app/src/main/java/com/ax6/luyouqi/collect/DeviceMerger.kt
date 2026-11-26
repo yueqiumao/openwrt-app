@@ -187,7 +187,7 @@ object DeviceMerger {
         else -> 3
     }
 
-    /** "192.168.99.11/24" 形式；解析失败时按"在网段内"处理，宁可多显示一台也不吞设备。 */
+    /** "10.10.10.11/24" 形式；解析失败时按"在网段内"处理，宁可多显示一台也不吞设备。 */
     fun ipv4InCidr(ip: String, cidr: String): Boolean {
         val address = cidr.substringBefore('/')
         val prefix = cidr.substringAfter('/', "").toIntOrNull() ?: return true

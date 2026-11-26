@@ -57,7 +57,7 @@ class NormalizerTest {
               "up": true,
               "proto": "static",
               "device": "br-lan",
-              "ipv4-address": [{"address": "192.168.99.1", "mask": 24}],
+              "ipv4-address": [{"address": "10.10.10.1", "mask": 24}],
               "stats": {"rx_bytes": 10, "tx_bytes": 20},
               "uptime": 9000
             }

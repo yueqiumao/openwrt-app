@@ -185,8 +185,8 @@ class DeviceMergerTest {
 
     @Test
     fun cidrMatcherHandlesLanRange() {
-        assertTrue(DeviceMerger.ipv4InCidr("192.168.99.125", "192.168.99.11/24"))
-        assertFalse(DeviceMerger.ipv4InCidr("192.168.1.13", "192.168.99.11/24"))
+        assertTrue(DeviceMerger.ipv4InCidr("10.10.10.125", "10.10.10.11/24"))
+        assertFalse(DeviceMerger.ipv4InCidr("192.168.1.13", "10.10.10.11/24"))
         assertTrue(DeviceMerger.ipv4InCidr("192.168.1.13", "192.168.1.0/24"))
     }
 }

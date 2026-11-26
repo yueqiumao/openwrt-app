@@ -19,6 +19,19 @@ android {
         versionName = "1.3.25"
     }
 
+    signingConfigs {
+        // 正式包签名材料只从环境变量读：CI 用 Secrets 注入，本地可用 keystore.properties（不入库）
+        val storePath = System.getenv("AX6_KEYSTORE") ?: ""
+        if (storePath.isNotBlank()) {
+            create("release") {
+                storeFile = file(storePath)
+                storePassword = System.getenv("AX6_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("AX6_KEY_ALIAS") ?: "ax6"
+                keyPassword = System.getenv("AX6_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -30,7 +43,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // release 签名材料由用户提供后再接入，当前不写入仓库
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

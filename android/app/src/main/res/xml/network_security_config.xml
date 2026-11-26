@@ -2,7 +2,8 @@
 <!--
   局域网直连需要明文 HTTP（路由器默认 http://192.168.x.x:80）。
   Android 的 domain-config 只能枚举固定域名/IP，无法覆盖任意内网 IP，
-  因此这里放开明文，但 App 内部另外限制：非 RFC1918/回环地址且未启用 HTTPS 时拒绝连接。
+  因此这里全局放开明文；App 内的地址校验已随无用代码清理移除，
+  请只在可信局域网内使用明文连接。
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
@@ -10,11 +11,4 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">192.168.99.11</domain>
-        <domain includeSubdomains="false">192.168.1.1</domain>
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-    </domain-config>
 </network-security-config>
