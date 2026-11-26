@@ -72,14 +72,14 @@ jobs:
           NAME=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts)
           APK=android/app/build/outputs/apk/release/app-release.apk
           mkdir -p artifacts
-          cp "$APK" "artifacts/AX6助手-v${NAME}.apk"
-          md5sum "artifacts/AX6助手-v${NAME}.apk" | tee artifacts/md5.txt
+          cp "$APK" "artifacts/AX6-Assistant-v${NAME}.apk"
+          md5sum "artifacts/AX6-Assistant-v${NAME}.apk" | tee artifacts/md5.txt
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/AX6助手-*.apk
+            artifacts/AX6-Assistant-*.apk
             artifacts/md5.txt
           generate_release_notes: true
