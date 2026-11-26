@@ -15,7 +15,7 @@ android/.idea/
 keystore.properties
 
 # ---- 出包目录 / 备份 / 真机抓包 ----
-[安卓]/
+[[]安卓[]]/
 backup/
 
 # ---- 系统文件 ----
