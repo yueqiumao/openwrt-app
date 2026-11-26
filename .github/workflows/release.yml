@@ -22,11 +22,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # ubuntu runner 自带 Android SDK，不再用 setup-android（其 sdkmanager tools 包已下线导致 404）
       - name: Install SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
