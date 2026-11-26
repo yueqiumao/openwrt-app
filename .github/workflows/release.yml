@@ -25,9 +25,11 @@ jobs:
       # ubuntu runner 自带 Android SDK，不再用 setup-android（其 sdkmanager tools 包已下线导致 404）
       - name: Install SDK packages
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          SDKM=$(ls "$SDK"/cmdline-tools/*/bin/sdkmanager | head -1)
+          echo "sdkmanager=$SDKM"
+          yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+          "$SDKM" "platforms;android-35" "build-tools;35.0.0" > /dev/null
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
