@@ -15,8 +15,8 @@ android {
         applicationId = "com.ax6.luyouqi"
         minSdk = 26
         targetSdk = 35
-        versionCode = 35
-        versionName = "1.3.34"
+        versionCode = 37
+        versionName = "1.4.00"
     }
 
     signingConfigs {

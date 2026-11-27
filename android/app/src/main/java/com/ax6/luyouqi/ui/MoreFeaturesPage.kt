@@ -64,8 +64,9 @@ fun MoreFeaturesPage(
             CardHead("Vantage")
             Spacer(Modifier.height(6.dp))
             Text(
-                "路由器安装 Vantage 仪表盘后，App 可新增这些功能：有线设备所在网口、同端口设备数、" +
-                    "端口累计流量、端口实时速率。没装则以 ARP 邻居表判断在线，不显示端口信息。",
+                "路由器安装 Vantage 仪表盘后，启用功能：有线设备显示实时速率，累计流量" +
+                    "（获取对应端口数据，一个端口下多设备时，为共享这个数据）、设备所在网口、同端口设备数。" +
+                    "没装则以 ARP 邻居表判断在线，不显示端口信息。",
                 color = Ax6Tokens.Muted,
                 fontSize = 11.sp,
                 lineHeight = 17.sp,
@@ -146,7 +147,7 @@ fun MoreFeaturesPage(
 private const val VANTAGE_URL = "anothadev.github.io/luci-theme-vantage"
 
 private fun vantageLabel(v: VantageProbe): String = when (v.state) {
-    VantageState.INSTALLED -> "已安装 · ${v.hosts} 台"
+    VantageState.INSTALLED -> "已安装"
     VantageState.MISSING -> "未安装"
     VantageState.DENIED -> "已安装 · 未放行"
     VantageState.UNKNOWN -> "检测失败"

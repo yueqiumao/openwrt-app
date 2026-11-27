@@ -84,6 +84,9 @@ class RouterRepository(private val session: RouterSession) {
     private var fdbFailedAt = 0L
     private var fdbCache: Map<String, WiredHost> = emptyMap()
 
+    /** 上一次 FDB 是否「成功且非空」：只有这种情况下才敢按 FDB 裁掉邻居表里的在线条目。 */
+    private var fdbAuthoritative = false
+
     private var connAt = 0L
     private var connCache: Pair<Int?, Int?>? = null
 
@@ -115,6 +118,7 @@ class RouterRepository(private val session: RouterSession) {
         fdbAt = 0
         fdbFailedAt = 0
         fdbCache = emptyMap()
+        fdbAuthoritative = false
     }
 
     fun reset() {
@@ -139,6 +143,7 @@ class RouterRepository(private val session: RouterSession) {
         fdbAt = 0
         fdbFailedAt = 0
         fdbCache = emptyMap()
+        fdbAuthoritative = false
         connAt = 0
         infoCache.clear()
         assocCache.clear()
@@ -616,6 +621,8 @@ class RouterRepository(private val session: RouterSession) {
         val raw = runCatching { session.call("luci.vantage", "wired") }.getOrNull() as? JsonObject
         if (raw == null) {
             fdbFailedAt = now
+            // 拉不到就别当权威：宁可退回邻居表口径，也不能因为一次失败把所有有线判成离线
+            fdbAuthoritative = false
             return fdbCache
         }
         fdbFailedAt = 0
@@ -639,10 +646,12 @@ class RouterRepository(private val session: RouterSession) {
                 port = port,
                 bridge = host.str("bridge"),
                 vlan = host.str("vlan"),
-                online = seen == null || seen <= 120,
+                // seen 是「距上次听到的秒数」；300 秒足够放过沉默的 IoT，又不至于把拔掉的设备挂太久
+                online = seen == null || seen <= 300,
             )
         }
         fdbCache = out
+        fdbAuthoritative = out.isNotEmpty()
         fdbAt = now
         return out
     }
@@ -667,19 +676,14 @@ class RouterRepository(private val session: RouterSession) {
 
         val fdb = vantageWired(devs, wifi)
 
-        val hosts = LinkedHashMap<String, WiredHost>()
-        online.forEach { (mac, up) ->
-            if (mac.isEmpty() || selfMacs.contains(mac) || wifiMacs.contains(mac)) return@forEach
-            val known = fdb[mac]
-            hosts[mac] = when {
-                known == null -> WiredHost(mac = mac, online = up)
-                else -> known.copy(online = up || known.online)
-            }
-        }
-        // 邻居表里还没出现的 FDB 条目也保留：端口先记下来，断开与否交给 seen
-        fdb.forEach { (mac, host) -> hosts.putIfAbsent(mac, host) }
-
-        val list = hosts.values.toList()
+        val list = WiredCandidates.pick(
+            online = online,
+            leaseMacs = emptyList(), // 租约已经在上面并进 online 了
+            selfMacs = selfMacs,
+            wifiMacs = wifiMacs,
+            fdb = fdb,
+            fdbAuthoritative = fdbAuthoritative,
+        )
         wiredRaw = list
         wiredMacs = list.filter { it.online }.map { it.mac }.toSet()
         return wiredMacs.size

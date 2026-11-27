@@ -248,6 +248,30 @@ class DeviceMergerTest {
     }
 
     @Test
+    fun wiredSourceIsFdbWhenPortKnown() {
+        // FDB 命中（有端口）时来源写 fdb，详情页显示「有线 FDB」
+        val fdbHosts = wiredHosts.map { host ->
+            if (host.mac.endsWith(":04")) host.copy(port = "lan2", bridge = "br-lan") else host
+        }
+        val (snapshot, _) = DeviceMerger.merge(
+            interfaces = ifaces,
+            wifi = wifi,
+            assoc = assoc,
+            leases = leases,
+            hints = hints,
+            wiredHosts = fdbHosts,
+            deviceMacs = deviceMacs,
+            clientRates = emptyMap(),
+            portRates = emptyMap(),
+            lastKinds = emptyMap(),
+            now = 1_700_000_000_000,
+        )
+        assertEquals("fdb", snapshot.devices.first { it.mac.endsWith(":04") }.source)
+        // 没有 FDB 的有线仍标邻居表
+        assertEquals("neigh", snapshot.devices.first { it.mac.endsWith(":05") }.source)
+    }
+
+    @Test
     fun leaseOnlyEntryStaysOfflineAndUnclassified() {
         val unknown = WiredHost(mac = "02:00:00:00:00:11", online = false)
         val (snapshot, _) = DeviceMerger.merge(

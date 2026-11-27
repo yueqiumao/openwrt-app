@@ -92,7 +92,8 @@ object DeviceMerger {
                     kind = DeviceKind.WIRED,
                     port = host.port,
                     bridge = host.bridge,
-                    source = "neigh",
+                    // 有线结论来自 vantage FDB 时如实标出来源；没有 FDB（端口为空）仍是邻居表
+                    source = if (host.port.isNotBlank()) "fdb" else "neigh",
                 )
             } else {
                 // 只有租约、邻居表里没有它：承认它存在，但不敢断言是有线还是无线
