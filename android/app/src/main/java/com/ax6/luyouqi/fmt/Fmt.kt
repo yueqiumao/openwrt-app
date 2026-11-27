@@ -30,13 +30,15 @@ object Fmt {
         return "${bytes(bytesPerSec, if (n > 1024 * 1024) 1 else 0)}/s"
     }
 
-    /** 汉语单位，始终带分钟：2天 0时 5分 / 23时 57分 / 57分 */
+    /** 汉语单位，始终带分钟：2天 0时 5分 / 23时 57分 / 57分；满 30 天起按月（30 天/月）：1月 5天 3时 9分 */
     fun durationCN(seconds: Long): String {
         val n = seconds.coerceAtLeast(0)
-        val d = n / 86400
+        val mo = n / (86400 * 30)
+        val d = (n % (86400 * 30)) / 86400
         val h = (n % 86400) / 3600
         val m = (n % 3600) / 60
         return when {
+            mo > 0 -> "${mo}月 ${d}天 ${h}时 ${m}分"
             d > 0 -> "${d}天 ${h}时 ${m}分"
             h > 0 -> "${h}时 ${m}分"
             else -> "${m}分"
@@ -141,10 +143,19 @@ object Fmt {
         return hash % 6
     }
 
-    /** 运行时间小字格式：5h 35m 48s（小时不折天，秒必须出现）。 */
+    /** 运行时间小字格式：5h 35m 48s / 1d 2h 9m 35s / 1mo 5d 3h 9m 35s（满 24h 折天，满 30 天折月，秒必须出现） */
     fun durationHMS(seconds: Long): String {
         val n = seconds.coerceAtLeast(0)
-        return "${n / 3600}h ${(n % 3600) / 60}m ${n % 60}s"
+        val mo = n / (86400 * 30)
+        val d = (n % (86400 * 30)) / 86400
+        val h = (n % 86400) / 3600
+        val m = (n % 3600) / 60
+        val s = n % 60
+        return when {
+            mo > 0 -> "${mo}mo ${d}d ${h}h ${m}m ${s}s"
+            d > 0 -> "${d}d ${h}h ${m}m ${s}s"
+            else -> "${h}h ${m}m ${s}s"
+        }
     }
 
     /** 协商速率：1.2 Gbps / 866 Mbps，空值 —。 */

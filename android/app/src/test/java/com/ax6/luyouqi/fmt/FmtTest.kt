@@ -34,6 +34,11 @@ class FmtTest {
         assertEquals("1时 1分", Fmt.durationCN(3661))
         assertEquals("1天 1时 1分", Fmt.durationCN(90061))
         assertEquals("2天 0时 5分", Fmt.durationCN(2 * 86400L + 5 * 60))
+        // 满 30 天才折月，29 天仍走天
+        assertEquals("29天 23时 59分", Fmt.durationCN(30 * 86400L - 60))
+        assertEquals("1月 0天 0时 0分", Fmt.durationCN(30 * 86400L))
+        assertEquals("1月 5天 3时 9分", Fmt.durationCN(35 * 86400L + 3 * 3600 + 9 * 60))
+        assertEquals("2月 1天 1时 0分", Fmt.durationCN(61 * 86400L + 3600))
     }
 
     @Test
@@ -76,6 +81,12 @@ class FmtTest {
     fun durationHmsKeepsSeconds() {
         assertEquals("5h 26m 48s", Fmt.durationHMS(5 * 3600 + 26 * 60 + 48))
         assertEquals("0h 0m 0s", Fmt.durationHMS(-5))
+        // 满 24h 折天
+        assertEquals("23h 59m 59s", Fmt.durationHMS(86400 - 1))
+        assertEquals("1d 2h 9m 35s", Fmt.durationHMS(86400L + 2 * 3600 + 9 * 60 + 35))
+        // 满 30 天才折月
+        assertEquals("29d 23h 59m 59s", Fmt.durationHMS(30 * 86400L - 1))
+        assertEquals("1mo 5d 3h 9m 35s", Fmt.durationHMS(35 * 86400L + 3 * 3600 + 9 * 60 + 35))
     }
 
     @Test
