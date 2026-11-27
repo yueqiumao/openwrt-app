@@ -255,11 +255,13 @@ class RouterRepository(private val session: RouterSession) {
 
     /**
      * CPU 占用率，两条通道按顺序试：
-     *  1. `luci getCPUUsage`——出厂 ACL 就放行，服务端自己算好的百分比，不依赖 /proc/stat 白名单；
-     *  2. `/proc/stat` 差分——只有自定义 ACL 放行了该文件才通，作老固件兜底。
+     *  1. `/proc/stat` 差分——约 51ms，按 App 自己的 3 秒间隔算，数值平滑；
+     *     出厂 ACL 不放行，但装了 luci-app-vantage 后其 ACL 会顺带放开该路径；
+     *  2. `luci getCPUUsage`——约 165ms（rpcd 45ms + 接口内部约 100ms 采样窗口），
+     *     出厂 ACL 就放行，任何固件都能用，但返回的是 100ms 窗口瞬时值，数值会跳。
      * 两条都拿不到就返回 null，由负载折算兜底；失败通道 60 秒内不再重试，避免拖慢轮询。
      */
-    private suspend fun cpuUsage(now: Long): Double? = cpuFromLuci(now) ?: cpuFromProc(now)
+    private suspend fun cpuUsage(now: Long): Double? = cpuFromProc(now) ?: cpuFromLuci(now)
 
     private suspend fun cpuFromLuci(now: Long): Double? {
         if (luciCpuFailedAt != 0L && now - luciCpuFailedAt < 60_000) return null

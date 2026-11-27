@@ -13,22 +13,14 @@
 | LuCI 表单登录（`/cgi-bin/luci`） | HTTP 403 |
 | `network.wireless status` | 与 `luci-rpc getWirelessDevices` 结果不一致/不可用 |
 
-因此：接口计数走 `luci-rpc getNetworkDevices`，WiFi 走 `iwinfo`，有线拓扑走 `luci.vantage wired`，温度走 `luci getTempInfo`，CPU 走 `luci getCPUUsage`（见下节）。
+因此：接口计数走 `luci-rpc getNetworkDevices`，WiFi 走 `iwinfo`，有线拓扑走 `luci.vantage wired`，温度走 `luci getTempInfo`，CPU 走 `/proc/stat` 差分，取不到则退回 `luci getCPUUsage`（见下节）。
 
-## CPU 用量：两条通道（v1.3.32 起）
+## CPU 用量：两条通道
 
-现版本顺序是 `luci getCPUUsage` → `file read /proc/stat` 差分 → `load1/cores` 折算，失败通道 60 秒内不重试。
+顺序是 `/proc/stat` 差分 → `luci getCPUUsage` → `load1/cores` 折算，失败通道 60 秒内不重试。
 
-- `luci getCPUUsage`：出厂 ACL 就放行，约 170ms（rpcd 45ms 固定开销 + 接口内部约 100ms 采样窗口），返回 100ms 窗口瞬时值，整数百分比，会 0%↔3% 跳。
-- `file read /proc/stat`：约 46ms，按 App 自己的 3 秒间隔差分，数值平滑。**出厂 ACL 不含该路径**（`code 6`）。
-
-`/proc/stat` 一直能用的情况只有一种：装过 `luci-app-vantage`。它的 `luci-app-vantage.json` 里写了 `"file": { "/proc/stat": ["read"] }`，而 `/etc/config/rpcd` 给 root 配的是 `read '*'`，等于装了插件就把这条权限带进来了。卸载或恢复出厂后自动消失，App 会静默退回 `luci getCPUUsage`。
-
-不建议再手工加 `/usr/share/rpcd/acl.d/ax6-cpu.json`（ubus `file.write` 写不进该目录，`code 6`，只能走 shell），换机、重置都要重做一遍。
-
-### 待办（等真机装上 vantage 后处理）
-
-装上 vantage 后 `/proc/stat` 会自动放开，此时把顺序调成 `/proc/stat` → `luci getCPUUsage` 更划算：每拍 46ms 而不是 170ms，数值也更平滑。前置条件是先在真机上确认 `file read /proc/stat` 真的通了（`session.access` 的 `file` 白名单里能看到该路径），再改顺序。
+- `file read /proc/stat`：约 51ms，按 App 自己的 3 秒间隔差分，数值平滑。出厂 ACL 不含该路径（`code 6`）；装了 `luci-app-vantage` 后其 ACL 会顺带放开。
+- `luci getCPUUsage`：约 165ms（rpcd 45ms 固定开销 + 接口内部约 100ms 采样窗口），出厂 ACL 就放行，返回 100ms 窗口瞬时值，会 0%↔3% 跳。
 
 ## 常见错误码
 
