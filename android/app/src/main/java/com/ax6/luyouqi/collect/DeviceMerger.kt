@@ -78,7 +78,7 @@ object DeviceMerger {
             }
         }
 
-        // 2) 有线候选（ARP 邻居表 + DHCP 租约；默认固件没有 FDB，端口未知）
+        // 2) 有线候选（ARP 邻居表 + DHCP 租约定在线；装了 vantage 时叠加 FDB 的端口）
         val portCounts = HashMap<String, Int>()
         wiredHosts.forEach { host ->
             val key = mac(host.mac)
@@ -98,7 +98,8 @@ object DeviceMerger {
                 // 只有租约、邻居表里没有它：承认它存在，但不敢断言是有线还是无线
                 current.copy(online = false, source = current.source.ifBlank { "lease" })
             }
-            if (host.port.isNotBlank()) portCounts[host.port] = (portCounts[host.port] ?: 0) + 1
+            // 只有在线终端才算「同端口共享」；离线条目留着端口字段但不参与计数
+            if (host.online && host.port.isNotBlank()) portCounts[host.port] = (portCounts[host.port] ?: 0) + 1
         }
 
         // 3) 租约补名字/IP

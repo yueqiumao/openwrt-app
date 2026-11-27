@@ -80,6 +80,9 @@ class RouterRepository(private val session: RouterSession) {
     private var neighAt = 0L
     private var neighCache: List<Neighbors.Entry> = emptyList()
     private var wiredMacs: Set<String> = emptySet()
+    private var fdbAt = 0L
+    private var fdbFailedAt = 0L
+    private var fdbCache: Map<String, WiredHost> = emptyMap()
 
     private var connAt = 0L
     private var connCache: Pair<Int?, Int?>? = null
@@ -107,6 +110,13 @@ class RouterRepository(private val session: RouterSession) {
     private var clientRates: Map<String, Rates> = emptyMap()
     private val lastKinds = HashMap<String, Pair<DeviceKind, Long>>()
 
+    /** 装/卸插件后让下一拍重新抓一次 FDB，不用断开重连。 */
+    fun clearFdbCache() {
+        fdbAt = 0
+        fdbFailedAt = 0
+        fdbCache = emptyMap()
+    }
+
     fun reset() {
         clientTracker.reset()
         lastKinds.clear()
@@ -126,6 +136,9 @@ class RouterRepository(private val session: RouterSession) {
         neighCache = emptyList()
         wiredMacs = emptySet()
         wiredRaw = emptyList()
+        fdbAt = 0
+        fdbFailedAt = 0
+        fdbCache = emptyMap()
         connAt = 0
         infoCache.clear()
         assocCache.clear()
@@ -589,10 +602,56 @@ class RouterRepository(private val session: RouterSession) {
     }
 
     /**
-     * 有线终端候选 = 邻居表（谁在线）+ DHCP 租约（谁存在过）。
+     * vantage FDB：MAC ↔ 端口（port / bridge / vlan）。只有装了 `luci-app-vantage`
+     * 才有这个 ubus 对象；没装时调用返回 -32000，本方法静默退化成空表。
      *
-     * 默认固件没有 FDB，也没有其它接口能给出 MAC ↔ 端口，所以 port/bridge 一律留空：
-     * 端口归属、同端口共享数、端口累计归到设备这三件事都拿不到，UI 会显示"无法获取数据"。
+     * 5 秒缓存：转发表抓取比其它接口贵，667 项量级的表没必要每拍都取；
+     * 失败后 60 秒不再试，避免没装插件时每拍白跑一趟。
+     */
+    private suspend fun vantageWired(devs: Map<String, NetDev>, wifi: WifiState): Map<String, WiredHost> {
+        val now = System.currentTimeMillis()
+        if (fdbAt != 0L && now - fdbAt < 5_000) return fdbCache
+        if (fdbFailedAt != 0L && now - fdbFailedAt < 60_000) return fdbCache
+
+        val raw = runCatching { session.call("luci.vantage", "wired") }.getOrNull() as? JsonObject
+        if (raw == null) {
+            fdbFailedAt = now
+            return fdbCache
+        }
+        fdbFailedAt = 0
+
+        val selfMacs = devs.values.map { it.mac.lowercase() }.filter { it.isNotEmpty() }.toSet()
+        val wifiMacs = assocCache.values.map { it.second }.flatten().map { it.mac.lowercase() }.toSet()
+        val wifiPorts = wifi.ifnames.toSet()
+        val out = LinkedHashMap<String, WiredHost>()
+        Normalizer.asList(raw["hosts"]).forEach { element ->
+            val host = element as? JsonObject ?: return@forEach
+            val mac = host.str("mac").lowercase().replace('-', ':')
+            val port = host.str("port")
+            if (mac.isEmpty()) return@forEach
+            if (selfMacs.contains(mac) || wifiMacs.contains(mac)) return@forEach
+            // FDB 里也带着无线客户端的接入口（phy0-ap0 之类），这些不是"有线"
+            if (port.isEmpty() || wifiPorts.contains(port)) return@forEach
+            if (Regex("^(phy|wlan|wl)", RegexOption.IGNORE_CASE).containsMatchIn(port)) return@forEach
+            val seen = host.int("seen")
+            out[mac] = WiredHost(
+                mac = mac,
+                port = port,
+                bridge = host.str("bridge"),
+                vlan = host.str("vlan"),
+                online = seen == null || seen <= 120,
+            )
+        }
+        fdbCache = out
+        fdbAt = now
+        return out
+    }
+
+    /**
+     * 有线终端候选：邻居表（谁在线）+ DHCP 租约（谁存在过）+ vantage FDB（在哪个口）。
+     *
+     * 没有插件时 FDB 为空表，port/bridge 一律留空，UI 自动不渲染那几行；
+     * 装了插件则端口、同端口台数、端口累计与端口速率一起恢复。
      */
     private suspend fun wiredScan(devs: Map<String, NetDev>, wifi: WifiState): Int {
         val selfMacs = devs.values.map { it.mac.lowercase() }.filter { it.isNotEmpty() }.toSet()
@@ -606,11 +665,23 @@ class RouterRepository(private val session: RouterSession) {
         // 租约只补"存在"，不参与在线判定；已经有邻居记录的以邻居为准
         leases().forEach { online.putIfAbsent(it.mac, false) }
 
-        val hosts = online.entries
-            .filter { (mac, _) -> mac.isNotEmpty() && !selfMacs.contains(mac) && !wifiMacs.contains(mac) }
-            .map { (mac, up) -> WiredHost(mac = mac, online = up) }
-        wiredRaw = hosts
-        wiredMacs = hosts.filter { it.online }.map { it.mac }.toSet()
+        val fdb = vantageWired(devs, wifi)
+
+        val hosts = LinkedHashMap<String, WiredHost>()
+        online.forEach { (mac, up) ->
+            if (mac.isEmpty() || selfMacs.contains(mac) || wifiMacs.contains(mac)) return@forEach
+            val known = fdb[mac]
+            hosts[mac] = when {
+                known == null -> WiredHost(mac = mac, online = up)
+                else -> known.copy(online = up || known.online)
+            }
+        }
+        // 邻居表里还没出现的 FDB 条目也保留：端口先记下来，断开与否交给 seen
+        fdb.forEach { (mac, host) -> hosts.putIfAbsent(mac, host) }
+
+        val list = hosts.values.toList()
+        wiredRaw = list
+        wiredMacs = list.filter { it.online }.map { it.mac }.toSet()
         return wiredMacs.size
     }
 

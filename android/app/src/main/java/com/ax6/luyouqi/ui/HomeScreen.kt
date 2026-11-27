@@ -92,6 +92,7 @@ fun HomeScreen(
     probe: ProbeUi = ProbeUi.Idle,
     onProbe: () -> Unit = {},
     readLog: () -> String = { "" },
+    onRecheckVantage: () -> Unit = {},
 ) {
     var selected by remember { mutableStateOf<Device?>(null) }
     var subPage by remember { mutableStateOf(0) }
@@ -126,6 +127,8 @@ fun HomeScreen(
                 NetProbePage(probe, onRun = onProbe) { subPage = 0 }
             } else if (subPage == 3) {
                 LogPage(remember { readLog() }) { subPage = 0 }
+            } else if (subPage == 4) {
+                MoreFeaturesPage(state.caps.vantage, onRecheck = onRecheckVantage) { subPage = 0 }
             } else {
                 when (state.tab) {
                     0 -> OverviewTab(state, onRefresh, onRange)
@@ -142,7 +145,8 @@ fun HomeScreen(
                         manualExit = manualExit,
                         onManualExitChange = onManualExitChange,
                         onOpenProbe = { subPage = 2 },
-                        onOpenLog = { subPage = 3 }, 
+                        onOpenLog = { subPage = 3 },
+                        onOpenMore = { subPage = 4 },
                     )
                     else -> Unit
                 }
@@ -1114,6 +1118,7 @@ private fun SettingsTab(
     onManualExitChange: (Boolean) -> Unit,
     onOpenProbe: () -> Unit = {},
     onOpenLog: () -> Unit = {},
+    onOpenMore: () -> Unit = {},
 ) {
     var confirmReboot by remember { mutableStateOf(false) }
     var pickExitMode by remember { mutableStateOf(false) }
@@ -1152,6 +1157,8 @@ private fun SettingsTab(
         ActionRow("扫描WiFi", "→", onClick = onOpenScan)
         ActionDivider()
         ActionRow("公网检测", "→", onClick = onOpenProbe)
+        ActionDivider()
+        ActionRow("更多功能", "→", onClick = onOpenMore)
     }
 
     Spacer(Modifier.height(Ax6Dimens.CardGap))

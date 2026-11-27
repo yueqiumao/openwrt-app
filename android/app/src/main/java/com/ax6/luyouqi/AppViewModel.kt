@@ -72,7 +72,19 @@ sealed interface AppUiState {
 /** 数据源探测结果，映射成设置页的诊断行。 */
 data class ProbeItem(val label: String, val value: String, val ok: Boolean)
 
-data class Capabilities(val items: List<ProbeItem> = emptyList())
+/** Vantage 插件在路由器上的状态。「更多功能」页按它决定展示什么。 */
+enum class VantageState { INSTALLED, MISSING, DENIED, UNKNOWN }
+
+data class VantageProbe(
+    val state: VantageState = VantageState.UNKNOWN,
+    val hosts: Int = 0,
+    val message: String = "",
+)
+
+data class Capabilities(
+    val items: List<ProbeItem> = emptyList(),
+    val vantage: VantageProbe = VantageProbe(),
+)
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -390,6 +402,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 「更多功能」页重新检测：清掉 FDB 缓存后重跑一遍能力探测，并把结果写回状态。 */
+    fun recheckVantage() {
+        val current = _state.value as? AppUiState.Connected ?: return
+        viewModelScope.launch {
+            repository?.clearFdbCache()
+            val caps = runCatching { probeCapabilities() }.getOrNull() ?: return@launch
+            val latest = _state.value as? AppUiState.Connected ?: return@launch
+            _state.value = latest.copy(caps = latest.caps.copy(vantage = caps.vantage, items = caps.items))
+        }
+    }
+
     fun selectRange(seconds: Int) {
         val current = _state.value as? AppUiState.Connected ?: return
         _state.value = current.copy(range = seconds)
@@ -473,10 +496,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         val directWired = runCatching { session.call("luci.vantage", "wired") }
         val hosts = (directWired.getOrNull()?.jsonObject?.get("hosts") as? JsonArray)?.size
-        items += if (hosts != null) {
-            ProbeItem("有线端口映射", "可用 · $hosts 台（ubus 直连）", true)
-        } else {
-            ProbeItem("有线端口映射", "不可用", false)
+        val ubusCode = (directWired.exceptionOrNull() as? RouterException)?.ubusCode
+        val vantage = when {
+            hosts != null -> VantageProbe(VantageState.INSTALLED, hosts, "端口映射可用")
+            ubusCode == -32002 -> VantageProbe(VantageState.DENIED, 0, "插件已装，但 ubus 未放行")
+            ubusCode == -32000 -> VantageProbe(VantageState.MISSING, 0, "路由器未安装插件")
+            else -> VantageProbe(VantageState.UNKNOWN, 0, "探测失败，请重试")
+        }
+        items += when (vantage.state) {
+            VantageState.INSTALLED -> ProbeItem("有线端口映射", "可用 · ${vantage.hosts} 台（vantage FDB）", true)
+            VantageState.DENIED -> ProbeItem("有线端口映射", "被拒绝 · 插件 ubus 未放行", false)
+            VantageState.MISSING -> ProbeItem("有线端口映射", "不可用 · 未装 vantage", false)
+            VantageState.UNKNOWN -> ProbeItem("有线端口映射", "探测失败", false)
         }
 
         val remarks = runCatching {
@@ -491,7 +522,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         items += ProbeItem("LuCI 通道", "不使用（ubus 直连已覆盖）", true)
-        return Capabilities(items)
+        return Capabilities(items, vantage)
     }
 
     private suspend fun readConntrackDirect(): Int? {

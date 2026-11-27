@@ -182,6 +182,72 @@ class DeviceMergerTest {
     }
 
     @Test
+    fun fdbPortsRestoreRateSharingAndTotals() {
+        // 装了 vantage：FDB 给出端口，端口速率/累计/共享台数应回到详情页
+        val fdbHosts = wiredHosts.map { host ->
+            if (host.mac.endsWith(":04") || host.mac.endsWith(":05")) {
+                host.copy(port = "lan2", bridge = "br-lan", online = true)
+            } else {
+                host
+            }
+        }
+        val (snapshot, _) = DeviceMerger.merge(
+            interfaces = ifaces,
+            wifi = wifi,
+            assoc = assoc,
+            leases = leases,
+            hints = hints,
+            wiredHosts = fdbHosts,
+            deviceMacs = deviceMacs,
+            clientRates = emptyMap(),
+            portRates = mapOf("lan2" to Rates(down = 3000, up = 1000)),
+            portTotals = mapOf("lan2" to Rates(down = 9_000_000, up = 3_000_000)),
+            lastKinds = emptyMap(),
+            now = 1_700_000_000_000,
+        )
+        val a = snapshot.devices.first { it.mac.endsWith(":04") }
+        val b = snapshot.devices.first { it.mac.endsWith(":05") }
+        assertEquals("lan2", a.port)
+        assertEquals("br-lan", a.bridge)
+        assertEquals(2, a.portPeers)
+        assertEquals(2, b.portPeers)
+        assertTrue(a.rateShared)
+        // 端口计数是路由器视角，展示要换成终端视角：down = 端口 tx，up = 端口 rx
+        assertEquals(Rates(down = 1000, up = 3000), a.rate)
+        assertEquals(9_000_000L, a.downTotal)
+        assertEquals(3_000_000L, a.upTotal)
+    }
+
+    @Test
+    fun offlineFdbEntryDoesNotCountAsPortPeer() {
+        val fdbHosts = wiredHosts.map { host ->
+            if (host.mac.endsWith(":04") || host.mac.endsWith(":05")) {
+                host.copy(port = "lan2", bridge = "br-lan", online = true)
+            } else if (host.mac.endsWith(":0e")) {
+                // FDB 里有、邻居表里已消失：端口保留，但在线为 false，不参与同端口计数
+                host.copy(port = "lan2", bridge = "br-lan", online = false)
+            } else {
+                host
+            }
+        }
+        val (snapshot, _) = DeviceMerger.merge(
+            interfaces = ifaces,
+            wifi = wifi,
+            assoc = assoc,
+            leases = leases,
+            hints = hints,
+            wiredHosts = fdbHosts,
+            deviceMacs = deviceMacs,
+            clientRates = emptyMap(),
+            portRates = mapOf("lan2" to Rates(down = 3000, up = 1000)),
+            lastKinds = emptyMap(),
+            now = 1_700_000_000_000,
+        )
+        val online = snapshot.devices.first { it.mac.endsWith(":04") }
+        assertEquals(2, online.portPeers)
+    }
+
+    @Test
     fun leaseOnlyEntryStaysOfflineAndUnclassified() {
         val unknown = WiredHost(mac = "02:00:00:00:00:11", online = false)
         val (snapshot, _) = DeviceMerger.merge(

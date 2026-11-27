@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
                         probe = probe,
                         onProbe = viewModel::runProbe,
                         readLog = viewModel::logReport,
+                        onRecheckVantage = viewModel::recheckVantage,
                     )
                 }
             }
