@@ -127,16 +127,19 @@ class FixtureTest {
     }
 
     @Test
-    fun vantageWired_hostsHavePortsAndWifiPortsAreFilterable() {
-        val hosts = (jsonOf("luci.vantage.wired.json").jsonObject["hosts"] as kotlinx.serialization.json.JsonArray)
-            .map { it.jsonObject }
-        assertTrue(hosts.isNotEmpty())
-        val wifiPort = Regex("^(phy\\d|wlan|wl)", RegexOption.IGNORE_CASE)
-        val wifiHosts = hosts.filter { wifiPort.containsMatchIn(it.text("port")) }
-        val wiredHosts = hosts.filter { !wifiPort.containsMatchIn(it.text("port")) && it.text("port") in setOf("wan", "lan1", "lan2", "lan3") }
-        assertTrue(wifiHosts.isNotEmpty())  // 真机上有 WiFi 客户端混在 wired 列表里
-        assertTrue(wiredHosts.isNotEmpty()) // lan2/lan3 上的设备应被算作有线
-        assertFalse(wiredHosts.any { it.text("port").contains("phy") })
+    fun neighbourTable_hasLanEntriesAndWanNoise() {
+        val raw = jsonOf("file.exec.ip4.neigh.json").jsonObject
+        assertEquals(0, raw.text("code").toInt())
+        val entries = Neighbors.parse(raw.text("stdout"))
+        assertTrue(entries.isNotEmpty())
+        // 局域网侧：带 lladdr、dev 为 br-lan
+        val lan = entries.filter { Neighbors.isLanDev(it.dev) && it.mac.isNotEmpty() }
+        assertTrue(lan.isNotEmpty())
+        assertTrue(lan.any { it.state == Neighbors.State.PRESENT })
+        assertTrue(lan.any { it.state == Neighbors.State.UNCONFIRMED })
+        // wan 侧：上游网段的 FAILED 条目，必须被 isLanDev 挡掉
+        assertTrue(entries.any { it.dev == "wan" && it.state == Neighbors.State.GONE })
+        assertTrue(entries.none { it.dev == "wan" && Neighbors.isLanDev(it.dev) })
     }
 
     @Test

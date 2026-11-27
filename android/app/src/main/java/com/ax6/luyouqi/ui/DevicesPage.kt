@@ -77,6 +77,10 @@ private val AVATAR_COLORS = listOf(
     Color(0xFF22D3EE) to Color(0xFF0891B2),
 )
 
+/** 默认固件接口取不到的数据统一写法：宁可在界面上承认缺失，也不要显示 0 或「—」误导。 */
+private const val NO_DATA = "无法获取数据"
+
+
 @Composable
 fun DevicesPage(snapshot: DeviceSnapshot?, onOpen: (Device) -> Unit) {
     var query by remember { mutableStateOf("") }
@@ -274,8 +278,18 @@ private fun DeviceRow(
                     style = numStyle(10),
                 )
             } else if (online) {
-                Text("↓ ${Fmt.rate(device.rate.down)}", color = Ax6Tokens.Down, style = numStyle(10))
-                Text("↑ ${Fmt.rate(device.rate.up)}", color = Ax6Tokens.Up, style = numStyle(10))
+                // 有线设备的速率来自端口计数，默认固件拿不到端口归属，只能显示缺失
+                val rateKnown = device.kind != DeviceKind.WIRED || device.port.isNotBlank()
+                Text(
+                    if (rateKnown) "↓ ${Fmt.rate(device.rate.down)}" else "↓ —",
+                    color = if (rateKnown) Ax6Tokens.Down else Ax6Tokens.Dim,
+                    style = numStyle(10),
+                )
+                Text(
+                    if (rateKnown) "↑ ${Fmt.rate(device.rate.up)}" else "↑ —",
+                    color = if (rateKnown) Ax6Tokens.Up else Ax6Tokens.Dim,
+                    style = numStyle(10),
+                )
             } else {
                 Text("—", color = Ax6Tokens.Dim, fontSize = 11.sp)
             }
@@ -433,8 +447,14 @@ fun DeviceDetailDialog(device: Device, onClose: () -> Unit) {
                 DetailRow("连接时长", device.connectedTime?.let { Fmt.duration(it) } ?: "—")
             }
             if (device.online && device.kind == DeviceKind.WIRED) {
-                DetailRow("端口", device.port.uppercase().ifBlank { "—" })
-                if (device.portPeers > 1) DetailRow("累计流量同端口多设备共享", "${device.portPeers} 台")
+                // 默认固件没有 FDB：MAC 到端口的映射拿不到。取不到的字段直接不渲染，
+                // 不写「无法获取数据」，免得详情页一半是占位文字。
+                if (device.port.isNotBlank()) {
+                    DetailRow("端口", device.port.uppercase())
+                    if (device.portPeers > 1) {
+                        DetailRow("累计流量同端口多设备共享", "${device.portPeers} 台")
+                    }
+                }
             }
             val downTotal = device.downBytes
             val upTotal = device.upBytes
@@ -443,9 +463,15 @@ fun DeviceDetailDialog(device: Device, onClose: () -> Unit) {
                     "累计收发",
                     "↓ ${downTotal?.let { Fmt.bytes(it) } ?: "—"} · ↑ ${upTotal?.let { Fmt.bytes(it) } ?: "—"}",
                 )
+            } else if (device.kind == DeviceKind.WIRED && !device.online) {
+                // 离线有线不在本次改动范围，保持原样
+                DetailRow("累计收发", NO_DATA)
             }
             if (device.online) {
-                DetailRow("实时速率", "↓ ${Fmt.rate(device.rate.down)} · ↑ ${Fmt.rate(device.rate.up)}")
+                val rateKnown = device.kind != DeviceKind.WIRED || device.port.isNotBlank()
+                if (rateKnown) {
+                    DetailRow("实时速率", "↓ ${Fmt.rate(device.rate.down)} · ↑ ${Fmt.rate(device.rate.up)}")
+                }
             }
             if ((device.leaseExpires ?: 0) > 0) {
                 DetailRow("租约剩余", Fmt.duration(device.leaseExpires!!))
@@ -455,6 +481,7 @@ fun DeviceDetailDialog(device: Device, onClose: () -> Unit) {
                 when (device.source) {
                     "wifi" -> "无线关联表"
                     "fdb" -> "有线 FDB"
+                    "neigh" -> "ARP 邻居表"
                     "lease" -> "DHCP 租约"
                     "hint" -> "ARP 主机表"
                     "remark" -> "备注（已离线）"

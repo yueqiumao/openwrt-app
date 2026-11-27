@@ -74,11 +74,20 @@ class DeviceMergerTest {
         }
     }
 
+    private val wifiMacs by lazy { assoc.values.flatten().map { it.mac.lowercase() }.toSet() }
+
+    /** 与 RouterRepository.wiredScan 同口径：邻居表判在线、租约补存在、剔除路由自身与 WiFi 终端。 */
     private val wiredHosts by lazy {
-        (obj("luci.vantage.wired.json")["hosts"] as JsonArray).map { element ->
-            val o = element.jsonObject
-            WiredHost(text(o, "mac"), text(o, "port"), text(o, "bridge"), "")
+        val online = LinkedHashMap<String, Boolean>()
+        val neigh = obj("file.exec.ip4.neigh.json")
+        Neighbors.parse(text(neigh, "stdout")).forEach { entry ->
+            if (entry.mac.isEmpty() || !Neighbors.isLanDev(entry.dev)) return@forEach
+            online[entry.mac] = entry.state != Neighbors.State.GONE
         }
+        leases.forEach { online.putIfAbsent(it.mac.lowercase(), false) }
+        online.entries
+            .filter { (mac, _) -> !mac.isEmpty() && !deviceMacs.contains(mac) && !wifiMacs.contains(mac) }
+            .map { (mac, up) -> WiredHost(mac = mac, online = up) }
     }
 
     private val deviceMacs by lazy {
@@ -109,18 +118,20 @@ class DeviceMergerTest {
         val (snapshot, _) = runMerge()
         val expectedWifi = assoc.values.flatten().map { it.mac }.toSet().size
         assertEquals(expectedWifi, snapshot.totals.wifi)
-        assertEquals(2, snapshot.totals.wired) // 真机 vantage 里只有 lan2、lan3 两台上游设备
-        assertEquals(expectedWifi + 2, snapshot.totals.online)
+        // 邻居表里 lan 侧 3 台：00:04 REACHABLE、00:05 STALE、00:0e 只有邻居没有租约（静态 IP）
+        assertEquals(3, snapshot.totals.wired)
+        assertEquals(expectedWifi + 3, snapshot.totals.online)
         assertEquals(snapshot.devices.count { it.online }, snapshot.totals.online)
     }
 
     @Test
     fun wifiClientsAreNotCountedAsWired() {
         val (snapshot, _) = runMerge()
-        // vantage 的 hosts 里混着 phy1-ap0 的 7 台 WiFi 客户端，不能被算成有线
+        // 邻居表里同时出现 WiFi 客户端（00:09 STALE）与路由自身（00:01），都不能算成有线
         val wired = snapshot.devices.filter { it.online && it.kind == DeviceKind.WIRED }
-        assertEquals(setOf("lan2", "lan3"), wired.map { it.port }.toSet())
-        assertFalse(wired.any { it.port.contains("phy") })
+        assertEquals(3, wired.size)
+        assertTrue(wired.none { wifiMacs.contains(it.mac) })
+        assertTrue(wired.none { it.mac == "02:00:00:00:00:01" })
         assertTrue(snapshot.devices.filter { it.kind == DeviceKind.WIFI }.all { it.ifname.startsWith("phy") })
     }
 
@@ -160,15 +171,36 @@ class DeviceMergerTest {
     }
 
     @Test
-    fun wiredDeviceUsesPortRateAndSharesFlag() {
-        val wired = wiredHosts.first { !it.port.startsWith("phy") && it.port in setOf("lan2", "lan3") }
-        // portRates 是路由器端口视角：down = 端口收到的（终端上传），up = 端口发出的（终端下载）。
-        // 设备侧口径与 WiFi 对齐（down = 终端下载），因此必须互换。
-        val (snapshot, _) = runMerge(portRates = mapOf(wired.port to Rates(down = 2048, up = 1024)))
-        val device = snapshot.devices.first { it.mac == DeviceMerger.mac(wired.mac) }
-        assertEquals(1024L, device.rate.down)
-        assertEquals(2048L, device.rate.up)
-        assertFalse(device.rateShared) // 该端口只有 1 台设备
+    fun wiredWithoutPortCarriesNoRateOrTotals() {
+        // 默认固件没有 FDB：端口未知，速率/累计/共享数都必须留空，由 UI 显示"无法获取数据"
+        val (snapshot, _) = runMerge(portRates = mapOf("lan2" to Rates(down = 2048, up = 1024)))
+        val wired = snapshot.devices.filter { it.online && it.kind == DeviceKind.WIRED }
+        assertTrue(wired.all { it.port.isBlank() })
+        assertTrue(wired.all { it.rate == Rates() })
+        assertTrue(wired.all { it.downTotal == null && it.upTotal == null })
+        assertTrue(wired.all { it.portPeers == 0 && !it.rateShared })
+    }
+
+    @Test
+    fun leaseOnlyEntryStaysOfflineAndUnclassified() {
+        val unknown = WiredHost(mac = "02:00:00:00:00:11", online = false)
+        val (snapshot, _) = DeviceMerger.merge(
+            interfaces = ifaces,
+            wifi = wifi,
+            assoc = assoc,
+            leases = leases,
+            hints = hints,
+            wiredHosts = wiredHosts + unknown,
+            deviceMacs = deviceMacs,
+            clientRates = emptyMap(),
+            portRates = emptyMap(),
+            lastKinds = emptyMap(),
+            now = 1_700_000_000_000,
+        )
+        val device = snapshot.devices.first { it.mac == "02:00:00:00:00:11" }
+        assertFalse(device.online)
+        assertEquals(DeviceKind.UNKNOWN, device.kind)
+        assertEquals("lease", device.source)
     }
 
     @Test

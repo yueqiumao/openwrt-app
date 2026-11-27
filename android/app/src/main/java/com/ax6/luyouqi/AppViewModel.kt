@@ -268,7 +268,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         home = data,
                         devices = snapshot ?: current.devices,
                         error = null,
-                        history = trim(current.history + HistoryPoint(data.ts, data.rates.down, data.rates.up), current.range),
+                        history = trim(
+                            current.history + HistoryPoint(data.ts, data.rates.down, data.rates.up),
+                            current.range,
+                        ),
                     )
                     withContext(Dispatchers.IO) {
                         runCatching { historyStore.append(HistoryPoint(data.ts, data.rates.down, data.rates.up)) }
@@ -406,6 +409,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun selectTab(index: Int) {
         val current = _state.value as? AppUiState.Connected ?: return
         _state.value = current.copy(tab = index)
+        // 离开首页就把速率窗口收回 5 分钟：1 分钟视图每拍多打一次路由器，别的页面没必要付这个成本
+        if (index != 0 && current.range == 60) selectRange(300)
     }
 
     fun refresh() {

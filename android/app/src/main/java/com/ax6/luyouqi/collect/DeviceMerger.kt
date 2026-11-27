@@ -78,23 +78,27 @@ object DeviceMerger {
             }
         }
 
-        // 2) 网桥 FDB（vantage wired）
+        // 2) 有线候选（ARP 邻居表 + DHCP 租约；默认固件没有 FDB，端口未知）
         val portCounts = HashMap<String, Int>()
         wiredHosts.forEach { host ->
             val key = mac(host.mac)
             if (key.isEmpty() || deviceMacs.contains(key)) return@forEach
-            if (wifiIfnames.contains(host.port) || Regex("^(phy\\d|wlan|wl)", RegexOption.IGNORE_CASE).containsMatchIn(host.port)) return@forEach
             val ensured = ensure(key) ?: return@forEach
             val current = devices.getValue(ensured)
             if (current.kind == DeviceKind.WIFI) return@forEach
-            devices[ensured] = current.copy(
-                online = true,
-                kind = DeviceKind.WIRED,
-                port = host.port,
-                bridge = host.bridge,
-                source = "fdb",
-            )
-            portCounts[host.port] = (portCounts[host.port] ?: 0) + 1
+            devices[ensured] = if (host.online) {
+                current.copy(
+                    online = true,
+                    kind = DeviceKind.WIRED,
+                    port = host.port,
+                    bridge = host.bridge,
+                    source = "neigh",
+                )
+            } else {
+                // 只有租约、邻居表里没有它：承认它存在，但不敢断言是有线还是无线
+                current.copy(online = false, source = current.source.ifBlank { "lease" })
+            }
+            if (host.port.isNotBlank()) portCounts[host.port] = (portCounts[host.port] ?: 0) + 1
         }
 
         // 3) 租约补名字/IP

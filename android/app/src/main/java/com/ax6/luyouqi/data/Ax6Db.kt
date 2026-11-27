@@ -63,6 +63,10 @@ class HistoryStore(private val dao: HistoryDao) {
     suspend fun append(point: HistoryPoint) {
         dao.insert(HistoryEntity(point.t, point.down, point.up))
         inserts += 1
+        pruneIfNeeded()
+    }
+
+    private suspend fun pruneIfNeeded() {
         if (inserts >= 200) {
             inserts = 0
             dao.prune(System.currentTimeMillis() - 4L * 3600 * 1000)

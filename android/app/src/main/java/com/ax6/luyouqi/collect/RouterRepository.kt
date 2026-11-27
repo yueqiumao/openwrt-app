@@ -61,6 +61,7 @@ class RouterRepository(private val session: RouterSession) {
 
     private var lastTs = 0L
     private var lastPrimaryKey = ""
+
     private var lastPrimaryRx = 0L
     private var lastPrimaryTx = 0L
 
@@ -76,7 +77,8 @@ class RouterRepository(private val session: RouterSession) {
     private val infoCache = HashMap<String, Pair<Long, JsonObject?>>()
     private val assocCache = HashMap<String, Pair<Long, List<AssocClient>>>()
 
-    private var vantageAt = 0L
+    private var neighAt = 0L
+    private var neighCache: List<Neighbors.Entry> = emptyList()
     private var wiredMacs: Set<String> = emptySet()
 
     private var connAt = 0L
@@ -99,7 +101,7 @@ class RouterRepository(private val session: RouterSession) {
     private var hintsAt = 0L
     private var hintCache: Map<String, HostHint> = emptyMap()
 
-    private var vantageRaw: List<WiredHost> = emptyList()
+    private var wiredRaw: List<WiredHost> = emptyList()
     private val clientTracker = RateTracker.Tracker()
     private var clientRates: Map<String, Rates> = emptyMap()
     private val lastKinds = HashMap<String, Pair<DeviceKind, Long>>()
@@ -119,7 +121,10 @@ class RouterRepository(private val session: RouterSession) {
         tempAt = 0
         devAt = 0
         wifiAt = 0
-        vantageAt = 0
+        neighAt = 0
+        neighCache = emptyList()
+        wiredMacs = emptySet()
+        wiredRaw = emptyList()
         connAt = 0
         infoCache.clear()
         assocCache.clear()
@@ -152,6 +157,7 @@ class RouterRepository(private val session: RouterSession) {
             ?: ifaces.firstOrNull { it.id == "wan6" }
             ?: ifaces.firstOrNull { it.up && it.id != "lan" }
         val primaryKey = primary?.let { p -> if (inline) p.id else p.device.ifEmpty { p.id } }.orEmpty()
+
         val rx = primary?.let { counters[it.id]?.first } ?: 0L
         val tx = primary?.let { counters[it.id]?.second } ?: 0L
 
@@ -192,7 +198,7 @@ class RouterRepository(private val session: RouterSession) {
         lastIfaces = ifaces
         lastWifi = wifi
         lastDeviceMacs = devs.values.map { it.mac.lowercase() }.filter { it.isNotEmpty() }.toSet()
-        val wired = wiredCount(devs, wifi)
+        val wired = wiredScan(devs, wifi)
         val connections = connections()
 
         fun withRate(iface: Iface?): Iface? = iface?.let { i ->
@@ -539,34 +545,52 @@ class RouterRepository(private val session: RouterSession) {
 
     // ---- 有线终端 / 连接数 ----------------------------------------------------
 
-    private suspend fun wiredCount(devs: Map<String, NetDev>, wifi: WifiState): Int {
+    /**
+     * ARP 邻居表：默认固件里唯一能判断"局域网内谁在线"的来源。
+     * 走 `file exec /sbin/ip -4 neigh show`（ACL 放行），5 秒缓存，避免每拍 fork 进程。
+     * 失败时返回空表——上层会把有线设备当成"未知"，而不是把设备藏起来。
+     */
+    private suspend fun neighbors(): List<Neighbors.Entry> {
         val now = System.currentTimeMillis()
-        if (vantageAt == 0L || now - vantageAt >= 5_000) {
-            val raw = runCatching { session.call("luci.vantage", "wired") }.getOrNull() as? JsonObject
-                ?: runCatching { session.luciCall("luci.vantage", "wired") }.getOrNull() as? JsonObject
-            val hosts = Normalizer.asList(raw?.get("hosts")).mapNotNull { it as? JsonObject }
-            val wifiIfnames = wifi.ifnames.toSet()
-            val selfMacs = devs.values.map { it.mac.lowercase() }.filter { it.isNotEmpty() }.toSet()
-            val wifiMacs = assocCache.values.map { it.second }.flatten().map { it.mac }.toSet()
+        if (neighAt != 0L && now - neighAt < 5_000) return neighCache
+        val raw = runCatching {
+            session.call(
+                "file",
+                "exec",
+                buildJsonObject {
+                    put("command", JsonPrimitive("/sbin/ip"))
+                    put("params", JsonArray(listOf(JsonPrimitive("-4"), JsonPrimitive("neigh"), JsonPrimitive("show"))))
+                },
+            ) as? JsonObject
+        }.getOrNull()
+        neighCache = Neighbors.parse(raw?.str("stdout").orEmpty())
+        neighAt = now
+        return neighCache
+    }
 
-            vantageRaw = hosts.mapNotNull { host ->
-                val mac = host.str("mac").lowercase().replace('-', ':')
-                if (mac.isEmpty()) null else WiredHost(mac, host.str("port"), host.str("bridge"), host.str("vlan"))
-            }
-            wiredMacs = hosts.mapNotNull { host ->
-                val mac = host.str("mac").lowercase().replace('-', ':')
-                val port = host.str("port")
-                when {
-                    mac.isEmpty() -> null
-                    selfMacs.contains(mac) -> null
-                    wifiMacs.contains(mac) -> null
-                    wifiIfnames.contains(port) -> null
-                    Regex("^(phy\\d|wlan|wl)", RegexOption.IGNORE_CASE).containsMatchIn(port) -> null
-                    else -> mac
-                }
-            }.toSet()
-            vantageAt = now
+    /**
+     * 有线终端候选 = 邻居表（谁在线）+ DHCP 租约（谁存在过）。
+     *
+     * 默认固件没有 FDB，也没有其它接口能给出 MAC ↔ 端口，所以 port/bridge 一律留空：
+     * 端口归属、同端口共享数、端口累计归到设备这三件事都拿不到，UI 会显示"无法获取数据"。
+     */
+    private suspend fun wiredScan(devs: Map<String, NetDev>, wifi: WifiState): Int {
+        val selfMacs = devs.values.map { it.mac.lowercase() }.filter { it.isNotEmpty() }.toSet()
+        val wifiMacs = assocCache.values.map { it.second }.flatten().map { it.mac.lowercase() }.toSet()
+
+        val online = LinkedHashMap<String, Boolean>()
+        neighbors().forEach { entry ->
+            if (entry.mac.isEmpty() || !Neighbors.isLanDev(entry.dev)) return@forEach
+            online[entry.mac] = entry.state != Neighbors.State.GONE
         }
+        // 租约只补"存在"，不参与在线判定；已经有邻居记录的以邻居为准
+        leases().forEach { online.putIfAbsent(it.mac, false) }
+
+        val hosts = online.entries
+            .filter { (mac, _) -> mac.isNotEmpty() && !selfMacs.contains(mac) && !wifiMacs.contains(mac) }
+            .map { (mac, up) -> WiredHost(mac = mac, online = up) }
+        wiredRaw = hosts
+        wiredMacs = hosts.filter { it.online }.map { it.mac }.toSet()
         return wiredMacs.size
     }
 
@@ -623,7 +647,7 @@ class RouterRepository(private val session: RouterSession) {
             assoc = assoc,
             leases = leases(),
             hints = hints(),
-            wiredHosts = vantageRaw,
+            wiredHosts = wiredRaw,
             remarks = remarks(),
             deviceMacs = lastDeviceMacs,
             clientRates = clientRates,

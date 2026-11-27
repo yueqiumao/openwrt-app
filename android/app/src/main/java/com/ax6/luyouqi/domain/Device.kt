@@ -52,4 +52,14 @@ data class Lease(val mac: String, val ip: String, val hostname: String, val expi
 
 data class HostHint(val name: String, val ip: String, val ip6: String, val ip6List: List<String>)
 
-data class WiredHost(val mac: String, val port: String, val bridge: String, val vlan: String)
+/**
+ * 有线终端候选。默认固件没有 FDB，[port]/[bridge]/[vlan] 通常为空（不可得），
+ * [online] 由 ARP 邻居表推断。
+ */
+data class WiredHost(
+    val mac: String,
+    val port: String = "",
+    val bridge: String = "",
+    val vlan: String = "",
+    val online: Boolean = true,
+)
