@@ -456,14 +456,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
+        val luciCpuText = runCatching {
+            session.call("luci", "getCPUUsage").jsonObject["cpuusage"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull()
+        val luciCpu = Normalizer.cpuPercent(luciCpuText.orEmpty())
         val statPayload = runCatching {
             session.call("file", "read", JsonObject(mapOf("path" to JsonPrimitive("/proc/stat"))))
         }.getOrNull()
         val statText = statPayload?.jsonObject?.get("data")?.jsonPrimitive?.contentOrNull
-        items += if (Normalizer.cpuTicks(statText.orEmpty()) != null) {
-            ProbeItem("CPU 用量通道", "已通 · /proc/stat", true)
-        } else {
-            ProbeItem("CPU 用量通道", "未通 · 用负载折算", false)
+        items += when {
+            luciCpu != null -> ProbeItem("CPU 用量通道", "已通 · luci（$luciCpu%）", true)
+            Normalizer.cpuTicks(statText.orEmpty()) != null -> ProbeItem("CPU 用量通道", "已通 · /proc/stat", true)
+            else -> ProbeItem("CPU 用量通道", "未通 · 用负载折算", false)
         }
 
         val directWired = runCatching { session.call("luci.vantage", "wired") }

@@ -89,6 +89,7 @@ class RouterRepository(private val session: RouterSession) {
     private var cpuPrev: Normalizer.CpuTicks? = null
     private var cpuUse: Double? = null
     private var cpuStatFailedAt = 0L
+    private var luciCpuFailedAt = 0L
 
     // ---- 终端页状态（sample 与 devices 共用，避免重复请求） ----
     private var lastIfaces: List<Iface> = emptyList()
@@ -253,10 +254,27 @@ class RouterRepository(private val session: RouterSession) {
     }
 
     /**
-     * 读 /proc/stat 做差分算真实占用率。rpcd 的 file.read 是白名单制，
-     * 被拒时静默退回 load 折算，并 60 秒内不再重试，避免拖慢轮询。
+     * CPU 占用率，两条通道按顺序试：
+     *  1. `luci getCPUUsage`——出厂 ACL 就放行，服务端自己算好的百分比，不依赖 /proc/stat 白名单；
+     *  2. `/proc/stat` 差分——只有自定义 ACL 放行了该文件才通，作老固件兜底。
+     * 两条都拿不到就返回 null，由负载折算兜底；失败通道 60 秒内不再重试，避免拖慢轮询。
      */
-    private suspend fun cpuUsage(now: Long): Double? {
+    private suspend fun cpuUsage(now: Long): Double? = cpuFromLuci(now) ?: cpuFromProc(now)
+
+    private suspend fun cpuFromLuci(now: Long): Double? {
+        if (luciCpuFailedAt != 0L && now - luciCpuFailedAt < 60_000) return null
+        val payload = runCatching { session.call("luci", "getCPUUsage") }.getOrNull() as? JsonObject
+        val pct = Normalizer.cpuPercent(payload?.str("cpuusage").orEmpty())
+        if (pct == null) {
+            luciCpuFailedAt = now
+            return null
+        }
+        luciCpuFailedAt = 0
+        cpuUse = pct
+        return cpuUse
+    }
+
+    private suspend fun cpuFromProc(now: Long): Double? {
         if (cpuStatFailedAt != 0L && now - cpuStatFailedAt < 60_000) return null
         val payload = runCatching {
             session.call("file", "read", JsonObject(mapOf("path" to JsonPrimitive("/proc/stat"))))

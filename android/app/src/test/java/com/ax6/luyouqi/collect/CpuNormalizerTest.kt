@@ -55,4 +55,24 @@ class CpuNormalizerTest {
         assertNull(Normalizer.cpuTicks("<html>not found</html>"))
         assertNull(Normalizer.cpuTicks(""))
     }
+
+    // ---- luci getCPUUsage 文本（出厂 ACL 唯一可用的 CPU 通道） ----
+
+    @Test
+    fun parsesLuciCpuPercent() {
+        // 真机返回 "cpuusage":"3%"；也容忍空格版与小数
+        assertEquals(3.0, Normalizer.cpuPercent("3%")!!, 0.001)
+        assertEquals(12.5, Normalizer.cpuPercent(" 12.5 % ")!!, 0.001)
+        assertEquals(0.0, Normalizer.cpuPercent("0%")!!, 0.001)
+        assertEquals(100.0, Normalizer.cpuPercent("100%")!!, 0.001)
+    }
+
+    @Test
+    fun rejectsBadLuciCpuText() {
+        assertNull(Normalizer.cpuPercent(""))
+        assertNull(Normalizer.cpuPercent("n/a"))
+        assertNull(Normalizer.cpuPercent("-1%"))
+        assertNull(Normalizer.cpuPercent("101%"))
+        assertNull(Normalizer.cpuPercent("<html>not found</html>"))
+    }
 }

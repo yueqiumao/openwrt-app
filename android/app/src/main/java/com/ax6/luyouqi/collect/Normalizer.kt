@@ -182,6 +182,19 @@ object Normalizer {
         return round(busy.toDouble() / dTotal * 1000.0) / 10.0
     }
 
+    /**
+     * luci getCPUUsage 返回的百分比文本，例如 "3%" / "12.5 %" / "0%"。
+     * 只认第一段数字；解析不出或超出 0..100 返回 null，交给上一条通道。
+     */
+    fun cpuPercent(text: String): Double? {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("-")) return null
+        val match = Regex("([0-9]+(?:\\.[0-9]+)?)").find(trimmed) ?: return null
+        val value = match.groupValues[1].toDoubleOrNull() ?: return null
+        if (value < 0.0 || value > 100.0) return null
+        return round(value * 10.0) / 10.0
+    }
+
     fun memory(raw: JsonObject?): Mem {
         val m = raw ?: JsonObject(emptyMap())
         val total = m.num("total")

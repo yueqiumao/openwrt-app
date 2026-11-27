@@ -6,7 +6,7 @@ data class Mem(val total: Long = 0, val used: Long = 0, val pct: Double = 0.0)
 
 data class SystemState(
     val load: List<Double> = listOf(0.0, 0.0, 0.0),
-    /** 真实占用率（/proc/stat 差分，0..100）。拿不到时为 null，退回负载折算。 */
+    /** 真实占用率（luci getCPUUsage，退回 /proc/stat 差分，0..100）。拿不到时为 null，退回负载折算。 */
     val cpuUse: Double? = null,
     val cores: Int = 4,
     val mem: Mem = Mem(),
@@ -16,7 +16,7 @@ data class SystemState(
 ) {
     val load1: Double get() = load.getOrElse(0) { 0.0 }
 
-    /** 优先真实占用率；/proc/stat 读不到时退回 load1/核心数 折算，仅作兜底。 */
+    /** 优先真实占用率；两条通道都读不到时退回 load1/核心数 折算，仅作兜底。 */
     val cpuPct: Double
         get() = cpuUse ?: (load1 / cores.coerceAtLeast(1) * 100).coerceIn(0.0, 999.0)
 }
